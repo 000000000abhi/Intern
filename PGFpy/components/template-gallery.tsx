@@ -19,20 +19,18 @@ interface TemplateGalleryProps {
 export function TemplateGallery({ selectedTemplate, onTemplateSelect, showPreview = true }: TemplateGalleryProps) {
   const [previewTemplate, setPreviewTemplate] = useState<PortfolioTemplate | null>(null)
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop")
-  const [codeView, setCodeView] = useState<"jsx" | "css" | "html">("jsx")
 
   const handlePreview = (template: PortfolioTemplate) => {
-    console.log("👁️ Opening template preview:", template.name)
     setPreviewTemplate(template)
   }
 
   const handleSelectTemplate = (templateId: string) => {
-    console.log("✅ Template selected:", templateId)
     onTemplateSelect(templateId)
   }
 
+  // categories + featured
   const categories = [...new Set(portfolioTemplates.map((t) => t.category))]
-  const featuredTemplates = portfolioTemplates.filter((t) => t.featured)
+  const featuredTemplates = portfolioTemplates.filter((t) => t.features?.includes("featured"))
 
   return (
     <div className="space-y-8">
@@ -74,7 +72,7 @@ export function TemplateGallery({ selectedTemplate, onTemplateSelect, showPrevie
             <TabsContent key={category} value={category}>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {portfolioTemplates
-                  .filter((template) => template.category === category)
+                  .filter((t) => t.category === category)
                   .map((template) => (
                     <TemplateCard
                       key={template.id}
@@ -98,9 +96,11 @@ export function TemplateGallery({ selectedTemplate, onTemplateSelect, showPrevie
             <DialogTitle className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span className="text-gray-900 dark:text-white">{previewTemplate?.name}</span>
-                <Badge variant="outline" className="text-xs">
-                  {previewTemplate?.category}
-                </Badge>
+                {previewTemplate?.category && (
+                  <Badge variant="outline" className="text-xs">
+                    {previewTemplate.category}
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -136,11 +136,14 @@ export function TemplateGallery({ selectedTemplate, onTemplateSelect, showPrevie
               <TabsTrigger value="html">HTML</TabsTrigger>
             </TabsList>
 
+            {/* Preview iframe */}
             <TabsContent value="preview" className="flex-1 mt-4">
               <div className="h-full border border-gray-200 dark:border-navy-700 rounded-lg overflow-hidden">
                 <div className={`h-full ${previewMode === "mobile" ? "max-w-sm mx-auto" : ""}`}>
                   <iframe
-                    src={previewMode === "desktop" ? previewTemplate?.preview.desktop : previewTemplate?.preview.mobile}
+                    src={
+                      previewMode === "desktop" ? previewTemplate?.preview.desktop : previewTemplate?.preview.mobile
+                    }
                     className="w-full h-full border-0"
                     title={`${previewTemplate?.name} Preview`}
                   />
@@ -148,26 +151,29 @@ export function TemplateGallery({ selectedTemplate, onTemplateSelect, showPrevie
               </div>
             </TabsContent>
 
+            {/* JSX */}
             <TabsContent value="jsx" className="flex-1 mt-4">
               <div className="h-full border border-gray-200 dark:border-navy-700 rounded-lg overflow-hidden">
                 <MonacoEditor
                   value={previewTemplate?.code.jsx || ""}
                   language="javascript"
                   height="100%"
-                  readOnly={true}
+                  readOnly
                 />
               </div>
             </TabsContent>
 
+            {/* CSS */}
             <TabsContent value="css" className="flex-1 mt-4">
               <div className="h-full border border-gray-200 dark:border-navy-700 rounded-lg overflow-hidden">
-                <MonacoEditor value={previewTemplate?.code.css || ""} language="css" height="100%" readOnly={true} />
+                <MonacoEditor value={previewTemplate?.code.css || ""} language="css" height="100%" readOnly />
               </div>
             </TabsContent>
 
+            {/* HTML */}
             <TabsContent value="html" className="flex-1 mt-4">
               <div className="h-full border border-gray-200 dark:border-navy-700 rounded-lg overflow-hidden">
-                <MonacoEditor value={previewTemplate?.code.html || ""} language="html" height="100%" readOnly={true} />
+                <MonacoEditor value={previewTemplate?.code.html || ""} language="html" height="100%" readOnly />
               </div>
             </TabsContent>
           </Tabs>
@@ -201,7 +207,7 @@ function TemplateCard({ template, isSelected, onSelect, onPreview, showPreview }
           alt={template.name}
           className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
         />
-        {template.featured && (
+        {template.features?.includes("featured") && (
           <div className="absolute top-3 left-3">
             <Badge className="bg-brand-500 text-white text-xs border-0">Featured</Badge>
           </div>

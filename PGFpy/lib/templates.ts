@@ -9,10 +9,25 @@ export interface TemplateConfig {
   category: string
   preview: string
   features: string[]
-  jsx: string
-  css: string
-  html: string
+  
+  // code parts (keep both flat + nested for flexibility)
+  jsx?: string
+  css?: string
+  html?: string
+  code?: {
+    jsx?: string
+    css?: string
+    html?: string
+  }
+
+  // new fields you are using
+  image?: string
+  tags?: string[]
+  featured?: boolean
+  desktop?: string
+  mobile?: string
 }
+
 
 export const portfolioTemplates: TemplateConfig[] = [
   {
@@ -22,6 +37,8 @@ export const portfolioTemplates: TemplateConfig[] = [
     category: "Developer",
     preview: "/placeholder.svg?height=400&width=600&text=Modern+Developer+Template",
     features: ["Dark/Light Mode", "Responsive Design", "Project Showcase", "Skills Grid"],
+       featured: true, // 👈 Featured template
+
     jsx: `import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -204,6 +221,8 @@ export default ModernDeveloperPortfolio;`,
     category: "Creative",
     preview: "/placeholder.svg?height=400&width=600&text=Creative+Designer+Template",
     features: ["Visual Portfolio", "Image Gallery", "Creative Layout", "Responsive Grid"],
+        featured: true, // 👈 Featured template
+
     jsx: `import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -395,6 +414,8 @@ export default CreativeDesignerPortfolio;`,
     category: "Business",
     preview: "/placeholder.svg?height=400&width=600&text=Professional+Business+Template",
     features: ["Corporate Design", "Professional Layout", "Contact Forms", "Service Sections"],
+       featured: true, // 👈 Featured template
+
     jsx: `import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -623,6 +644,8 @@ export default ProfessionalBusinessPortfolio;`,
     category: "Creative",
     preview: "/placeholder.svg?height=400&width=600&text=Minimalist+Writer+Template",
     features: ["Typography Focus", "Reading Experience", "Blog Layout", "Minimal Design"],
+       featured: true, // 👈 Featured template
+
     jsx: `import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

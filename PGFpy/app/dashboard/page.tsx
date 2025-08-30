@@ -1,240 +1,288 @@
+// app/dashboard/page.tsx
 "use client"
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { supabase, Profile, Resume, Portfolio } from "@/lib/supabase"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Upload, FileText, Sparkles, Eye, Download, Settings, Plus, MoreHorizontal, ExternalLink } from "lucide-react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { MoreHorizontal } from "lucide-react"
+import { ScrollArea } from "@/components/ui/scroll-area"
+
+// Optional: loading skeleton for better UX
+function DashboardSkeleton() {
+  return (
+    <div className="p-6 grid gap-6 lg:grid-cols-2 animate-pulse">
+      <Card className="h-40" />
+      <Card className="h-40" />
+      <Card className="h-60 lg:col-span-2" />
+    </div>
+  )
+}
 
 export default function DashboardPage() {
   const router = useRouter()
 
-  const portfolios = [
-    {
-      id: 1,
-      name: "Software Developer Portfolio",
-      status: "Published",
-      theme: "Modern Dark",
-      lastUpdated: "2 hours ago",
-      views: 1247,
-      progress: 100,
-    },
-    {
-      id: 2,
-      name: "UX Designer Portfolio",
-      status: "Draft",
-      theme: "Creative Light",
-      lastUpdated: "1 day ago",
-      views: 0,
-      progress: 75,
-    },
-    {
-      id: 3,
-      name: "Data Scientist Portfolio",
-      status: "Published",
-      theme: "Professional Blue",
-      lastUpdated: "3 days ago",
-      views: 892,
-      progress: 100,
-    },
-  ]
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [resumes, setResumes] = useState<Resume[]>([])
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const handleCreateNew = () => {
-    router.push("/upload")
-  }
+  // ---------- Fetch data ----------
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (userError || !user) {
+        console.error("Auth error:", userError)
+        setLoading(false)
+        return
+      }
+
+      const userId = user.id
+
+      try {
+        // Run all queries in parallel
+        const [profileRes, resumesRes, portfoliosRes] = await Promise.all([
+          supabase.from("profiles").select("*").eq("id", userId).single(),
+          supabase
+            .from("resumes")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("portfolios")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false }),
+        ])
+
+        // Profile
+        if (profileRes.data) {
+          setProfile(profileRes.data as Profile)
+        }
+
+        // Resumes
+        if (resumesRes.data) {
+          setResumes(
+            resumesRes.data.map((r: any): Resume => ({
+              id: r.id,
+              user_id: r.user_id ?? userId,
+              filename: r.filename,
+              file_size: r.file_size,
+              file_url: r.file_url ?? "",
+              extracted_text: r.extracted_text ?? "",
+              pages_count: r.pages_count ?? 0,
+              processing_status: r.processing_status ?? "completed",
+              created_at: r.created_at,
+              updated_at: r.updated_at ?? r.created_at,
+            }))
+          )
+        }
+
+        // Portfolios
+        if (portfoliosRes.data) {
+          setPortfolios(
+            portfoliosRes.data.map((p: any): Portfolio => ({
+              id: p.id,
+              user_id: p.user_id ?? userId,
+              portfolio_data_id: p.portfolio_data_id ?? "",
+              title: p.title ?? "Untitled Portfolio",
+              slug: p.slug ?? "",
+              template_id: p.template_id ?? "",
+              html_content: p.html_content ?? "",
+              css_content: p.css_content ?? "",
+              js_content: p.js_content ?? "",
+              metadata: p.metadata ?? { title: "", description: "", keywords: [] },
+              customizations: p.customizations ?? {},
+              is_published: !!p.is_published,
+              view_count: p.view_count ?? 0,
+              last_viewed_at: p.last_viewed_at ?? null,
+              created_at: p.created_at,
+              updated_at: p.updated_at ?? p.created_at,
+            }))
+          )
+        }
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  // ---------- Button handlers ----------
+  const handleUploadResume = () => router.push("/upload")
+  const handleCreatePortfolio = () => router.push("/upload")
+  const handleViewPortfolio = (p: Portfolio) =>
+    router.push(p.is_published && p.slug ? `/p/${p.slug}` : `/portfolios/${p.id}`)
+  const handleEditPortfolio = (p: Portfolio) =>
+    router.push(`/portfolios/${p.id}/edit`)
+  const handleDownloadResume = (r: Resume) => r.file_url && window.open(r.file_url, "_blank")
+
+  // ---------- UI ----------
+  if (loading) return <DashboardSkeleton />
+  if (!profile) return <div className="p-6">Please sign in to view your dashboard.</div>
+
+  const creditsPct = Math.min(100, Math.max(0, (profile.credits_remaining / 100) * 100))
 
   return (
-    <div className="min-h-screen bg-white dark:bg-navy-950">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+    <div className="p-6 grid gap-6 lg:grid-cols-2">
+      {/* Profile */}
+      <Card className="shadow-md">
+        <CardHeader>
+          <CardTitle>👤 {profile.full_name || profile.email}</CardTitle>
+          <CardDescription>User Profile</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p><span className="font-medium">Email:</span> {profile.email}</p>
+          <p>
+            <span className="font-medium">Subscription:</span>{" "}
+            <Badge variant={profile.subscription_tier === "pro" ? "default" : "secondary"}>
+              {profile.subscription_tier}
+            </Badge>
+          </p>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Dashboard</h1>
-            <p className="text-gray-600 dark:text-gray-300">Manage your AI-generated portfolios</p>
+            <div className="mb-1 font-medium">Credits Remaining</div>
+            <Progress value={creditsPct} className="h-2" />
+            <div className="text-xs text-muted-foreground mt-1">
+              {profile.credits_remaining} / 100
+            </div>
           </div>
-          <Button
-            onClick={handleCreateNew}
-            className="bg-brand-500 hover:bg-brand-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 mt-4 md:mt-0 border-0"
-          >
-            <Plus className="w-4 h-4 mr-2" />
+        </CardContent>
+      </Card>
+
+      {/* Resumes */}
+      <Card className="shadow-md">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>📄 Resumes</CardTitle>
+            <CardDescription>Your uploaded resumes</CardDescription>
+          </div>
+          <Button onClick={handleUploadResume} size="sm">Upload New</Button>
+        </CardHeader>
+        <CardContent>
+          {resumes.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No resumes uploaded yet.</div>
+          ) : (
+            <ScrollArea className="h-64 pr-2">
+              <ul className="space-y-2">
+                {resumes.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between rounded-md border p-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{r.filename}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(r.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={
+                        r.processing_status === "completed"
+                          ? "default"
+                          : r.processing_status === "failed"
+                          ? "destructive"
+                          : "secondary"
+                      }>
+                        {r.processing_status}
+                      </Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleDownloadResume(r)}>
+                            Download original
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={handleUploadResume}>
+                            Replace / Re-upload
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </ScrollArea>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Portfolios */}
+      <Card className="shadow-md lg:col-span-2">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>🌐 Portfolios</CardTitle>
+            <CardDescription>Your created portfolios</CardDescription>
+          </div>
+          <Button onClick={handleCreatePortfolio} size="sm">Create New</Button>
+        </CardHeader>
+        <CardContent>
+          {portfolios.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No portfolios created yet.</div>
+          ) : (
+            <ScrollArea className="h-80 pr-2">
+              <ul className="grid md:grid-cols-2 gap-4">
+                {portfolios.map((p) => (
+                  <Card key={p.id} className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-lg truncate">{p.title}</h3>
+                        <p className="text-xs text-muted-foreground truncate">
+                          Slug: {p.slug || "—"}
+                        </p>
+                      </div>
+                      <Badge variant={p.is_published ? "default" : "secondary"}>
+                        {p.is_published ? "Published" : "Draft"}
+                      </Badge>
+                    </div>
+
+                    <div className="mt-2 text-xs text-muted-foreground">Views: {p.view_count}</div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleViewPortfolio(p)}>
+                        {p.is_published ? "View" : "Preview"}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleEditPortfolio(p)}>
+                        Edit
+                      </Button>
+                      <Button variant="default" size="sm" asChild disabled={!p.is_published || !p.slug}>
+                        <Link href={p.is_published && p.slug ? `/p/${p.slug}` : "#"}>Open</Link>
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </ul>
+            </ScrollArea>
+          )}
+          <Button className="mt-4 w-full" onClick={handleCreatePortfolio}>
             Create New Portfolio
           </Button>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {[
-            {
-              title: "Total Portfolios",
-              value: "3",
-              change: "+1 this month",
-              icon: FileText,
-              color: "from-blue-500 to-cyan-500",
-            },
-            {
-              title: "Total Views",
-              value: "2,139",
-              change: "+12% from last month",
-              icon: Eye,
-              color: "from-emerald-500 to-teal-500",
-            },
-            {
-              title: "Published",
-              value: "2",
-              change: "67% completion rate",
-              icon: ExternalLink,
-              color: "from-brand-500 to-blue-500",
-            },
-            {
-              title: "AI Enhancements",
-              value: "15",
-              change: "Used this month",
-              icon: Sparkles,
-              color: "from-orange-500 to-red-500",
-            },
-          ].map((stat, index) => (
-            <Card
-              key={index}
-              className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white dark:bg-navy-900 border-gray-200 dark:border-navy-700"
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">{stat.title}</CardTitle>
-                <div
-                  className={`w-10 h-10 rounded-lg bg-gradient-to-r ${stat.color} flex items-center justify-center shadow-lg`}
-                >
-                  <stat.icon className="w-5 h-5 text-white" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{stat.value}</div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{stat.change}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Quick Actions */}
-        <Card className="mb-8 border-0 shadow-lg bg-white dark:bg-navy-900 border-gray-200 dark:border-navy-700">
-          <CardHeader>
-            <CardTitle className="text-xl font-bold text-gray-900 dark:text-white">Quick Actions</CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-300">
-              Get started with creating your portfolio
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button
-                variant="outline"
-                onClick={() => router.push("/upload")}
-                className="h-20 flex flex-col items-center justify-center space-y-2 hover:bg-brand-50 dark:hover:bg-navy-800 border-2 hover:border-brand-200 dark:hover:border-brand-700 bg-transparent border-gray-200 dark:border-navy-700"
-              >
-                <Upload className="w-6 h-6 text-brand-600 dark:text-brand-400" />
-                <span className="font-medium text-gray-900 dark:text-white">Upload Resume</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="h-20 flex flex-col items-center justify-center space-y-2 hover:bg-brand-50 dark:hover:bg-navy-800 border-2 hover:border-brand-200 dark:hover:border-brand-700 bg-transparent border-gray-200 dark:border-navy-700"
-              >
-                <Sparkles className="w-6 h-6 text-brand-600 dark:text-brand-400" />
-                <span className="font-medium text-gray-900 dark:text-white">AI Enhancement</span>
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => router.push("/templates")}
-                className="h-20 flex flex-col items-center justify-center space-y-2 hover:bg-brand-50 dark:hover:bg-navy-800 border-2 hover:border-brand-200 dark:hover:border-brand-700 bg-transparent border-gray-200 dark:border-navy-700"
-              >
-                <Settings className="w-6 h-6 text-brand-600 dark:text-brand-400" />
-                <span className="font-medium text-gray-900 dark:text-white">Browse Templates</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Portfolios List */}
-        <Card className="border-0 shadow-lg bg-white dark:bg-navy-900 border-gray-200 dark:border-navy-700">
-          <CardHeader>
-            <CardTitle className="text-xl font-bold text-gray-900 dark:text-white">Your Portfolios</CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-300">
-              Manage and edit your created portfolios
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {portfolios.map((portfolio) => (
-                <div
-                  key={portfolio.id}
-                  className="flex items-center justify-between p-4 border border-gray-200 dark:border-navy-700 rounded-lg hover:bg-gray-50 dark:hover:bg-navy-800 transition-colors duration-200"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-brand-100 dark:bg-brand-900/30 rounded-lg flex items-center justify-center">
-                      <FileText className="w-6 h-6 text-brand-600 dark:text-brand-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white">{portfolio.name}</h3>
-                      <div className="flex items-center space-x-4 mt-1">
-                        <Badge
-                          variant={portfolio.status === "Published" ? "default" : "secondary"}
-                          className={
-                            portfolio.status === "Published"
-                              ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700"
-                              : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-                          }
-                        >
-                          {portfolio.status}
-                        </Badge>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">{portfolio.theme}</span>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">•</span>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">{portfolio.lastUpdated}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">{portfolio.views} views</div>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <Progress value={portfolio.progress} className="w-16 h-2" />
-                        <span className="text-xs text-gray-500 dark:text-gray-400">{portfolio.progress}%</span>
-                      </div>
-                    </div>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="hover:bg-gray-100 dark:hover:bg-navy-700">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        className="bg-white dark:bg-navy-800 border-gray-200 dark:border-navy-700"
-                      >
-                        <DropdownMenuItem className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-navy-700">
-                          <Eye className="w-4 h-4 mr-2" />
-                          Preview
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-navy-700">
-                          <Settings className="w-4 h-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-navy-700">
-                          <Download className="w-4 h-4 mr-2" />
-                          Download
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-navy-700">
-                          <ExternalLink className="w-4 h-4 mr-2" />
-                          View Live
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
